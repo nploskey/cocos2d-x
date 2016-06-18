@@ -39,8 +39,30 @@ THE SOFTWARE.
 NS_CC_BEGIN
 
 class Scheduler;
+struct _listEntry;
+struct _hashSelectorEntry;
+struct _hashUpdateEntry;
 
 typedef std::function<void(float)> ccSchedulerFunc;
+
+struct UpdatePhase
+{
+	enum Id
+	{
+		EARLY_UPDATE,
+		FIXED_EARLY_UPDATE,
+		UPDATE,
+		FIXED_UPDATE,
+		LATE_UPDATE,
+		FIXED_LATE_UPDATE,
+		_numIds
+	};
+
+	_listEntry* negList = nullptr;
+	_listEntry* zeroList = nullptr;
+	_listEntry* posList = nullptr;
+	_hashUpdateEntry* hashtable = nullptr;
+};
 
 /**
  * @cond
@@ -140,10 +162,6 @@ private:
  * @addtogroup base
  * @{
  */
-
-struct _listEntry;
-struct _hashSelectorEntry;
-struct _hashUpdateEntry;
 
 #if CC_ENABLE_SCRIPT_BINDING
 class SchedulerScriptHandlerEntry;
@@ -271,6 +289,32 @@ public:
      */
     void schedule(SEL_SCHEDULE selector, Ref *target, float interval, bool paused);
     
+	/** Schedules the 'earlyUpdate' selector for a given target with a given priority.
+	The 'earlyUpdate' selector will be called every frame.
+	The lower the priority, the earlier it is called.
+	@since v3.0
+	@lua NA
+	*/
+	template <class T>
+	void scheduleEarlyUpdate(T *target, int priority, bool paused) {
+		this->schedulePerFrame(UpdatePhase::EARLY_UPDATE, [target](float dt) {
+			target->earlyUpdate(dt);
+		}, target, priority, paused);
+	}
+
+	/** Schedules the 'fixedEarlyUpdate' selector for a given target with a given priority.
+	The 'fixedEarlyUpdate' selector will be called every frame.
+	The lower the priority, the earlier it is called.
+	@since v3.0
+	@lua NA
+	*/
+	template <class T>
+	void scheduleFixedEarlyUpdate(T *target, int priority, bool paused) {
+		this->schedulePerFrame(UpdatePhase::FIXED_EARLY_UPDATE, [target](float dt) {
+			target->fixedEarlyUpdate(dt);
+		}, target, priority, paused);
+	}
+
     /** Schedules the 'update' selector for a given target with a given priority.
      The 'update' selector will be called every frame.
      The lower the priority, the earlier it is called.
@@ -280,10 +324,49 @@ public:
     template <class T>
     void scheduleUpdate(T *target, int priority, bool paused)
     {
-        this->schedulePerFrame([target](float dt){
-            target->update(dt);
-        }, target, priority, paused);
+		this->schedulePerFrame(UpdatePhase::UPDATE, [target](float dt) {
+			target->update(dt);
+		}, target, priority, paused);
     }
+
+	/** Schedules the 'fixedUpdate' selector for a given target with a given priority.
+	The 'fixedUpdate' selector will be called every frame.
+	The lower the priority, the earlier it is called.
+	@since v3.0
+	@lua NA
+	*/
+	template <class T>
+	void scheduleFixedUpdate(T* target, int priority, bool paused) {
+		this->schedulePerFrame(UpdatePhase::FIXED_UPDATE, [target](float dt) {
+			target->fixedUpdate(dt);
+		}, target, priority, paused);
+	}
+
+	/** Schedules the 'lateUpdate' selector for a given target with a given priority.
+	The 'lateUpdate' selector will be called every frame.
+	The lower the priority, the earlier it is called.
+	@since v3.0
+	@lua NA
+	*/
+	template <class T>
+	void scheduleLateUpdate(T *target, int priority, bool paused) {
+		this->schedulePerFrame(UpdatePhase::LATE_UPDATE, [target](float dt) {
+			target->lateUpdate(dt);
+		}, target, priority, paused);
+	}
+
+	/** Schedules the 'fixedLateUpdate' selector for a given target with a given priority.
+	The 'fixedLateUpdate' selector will be called every frame.
+	The lower the priority, the earlier it is called.
+	@since v3.0
+	@lua NA
+	*/
+	template <class T>
+	void scheduleFixedLateUpdate(T* target, int priority, bool paused) {
+		this->schedulePerFrame(UpdatePhase::FIXED_LATE_UPDATE, [target](float dt) {
+			target->fixedLateUpdate(dt);
+		}, target, priority, paused);
+	}
 
 #if CC_ENABLE_SCRIPT_BINDING
     // Schedule for script bindings.
@@ -318,11 +401,53 @@ public:
      */
     void unschedule(SEL_SCHEDULE selector, Ref *target);
     
+	/** Unschedules the earlyUpdate selector for a given target
+	@param target The target to be unscheduled.
+	@since v0.99.3
+	*/
+	void unscheduleEarlyUpdate(void *target) {
+		unschedulePerFrame(UpdatePhase::EARLY_UPDATE, target);
+	}
+
+	/** Unschedules the fixedEarlyUpdate selector for a given target
+	@param target The target to be unscheduled.
+	@since v0.99.3
+	*/
+	void unscheduleFixedEarlyUpdate(void *target) {
+		unschedulePerFrame(UpdatePhase::FIXED_EARLY_UPDATE, target);
+	}
+
     /** Unschedules the update selector for a given target
      @param target The target to be unscheduled.
      @since v0.99.3
      */
-    void unscheduleUpdate(void *target);
+    void unscheduleUpdate(void *target) {
+		unschedulePerFrame(UpdatePhase::UPDATE, target);
+    }
+
+	/** Unschedules the fixedUpdate selector for a given target
+	@param target The target to be unscheduled.
+	@since v0.99.3
+	*/
+	void unscheduleFixedUpdate(void *target) {
+		unschedulePerFrame(UpdatePhase::FIXED_UPDATE, target);
+	}
+
+	/** Unschedules the lateUpdate selector for a given target
+	@param target The target to be unscheduled.
+	@since v0.99.3
+	*/
+	void unscheduleLateUpdate(void *target) {
+		unschedulePerFrame(UpdatePhase::LATE_UPDATE, target);
+	}
+
+	/** Unschedules the fixedLateUpdate selector for a given target
+	@param target The target to be unscheduled.
+	@since v0.99.3
+	*/
+	void unscheduleFixedLateUpdate(void *target) {
+		unschedulePerFrame(UpdatePhase::FIXED_LATE_UPDATE, target);
+	}
     
     /** Unschedules all selectors for a given target.
      This also includes the "update" selector.
@@ -336,7 +461,9 @@ public:
      You should NEVER call this method, unless you know what you are doing.
      @since v0.99.3
      */
-    void unscheduleAll();
+	void unscheduleAll() {
+		unscheduleAllWithMinPriority(PRIORITY_SYSTEM);
+	}
     
     /** Unschedules all selectors from all targets with a minimum priority.
      You should only call this with `PRIORITY_NON_SYSTEM_MIN` or higher.
@@ -497,26 +624,25 @@ protected:
      @since v3.0
      @js _schedulePerFrame
      */
-    void schedulePerFrame(const ccSchedulerFunc& callback, void *target, int priority, bool paused);
+    void schedulePerFrame(UpdatePhase::Id phaseID, const ccSchedulerFunc& callback, void *target, int priority, bool paused);
+
+	void unschedulePerFrame(UpdatePhase::Id phaseID, void *target);
     
     void removeHashElement(struct _hashSelectorEntry *element);
-    void removeUpdateFromHash(struct _listEntry *entry);
+    void removeUpdateFromHash(struct _listEntry *entry, struct _hashUpdateEntry **hashtable);
 
     // update specific
 
-    void priorityIn(struct _listEntry **list, const ccSchedulerFunc& callback, void *target, int priority, bool paused);
-    void appendIn(struct _listEntry **list, const ccSchedulerFunc& callback, void *target, bool paused);
-
-
+    void priorityIn(struct _listEntry **list, struct _hashUpdateEntry **hashtable, const ccSchedulerFunc& callback, void *target, int priority, bool paused);
+    void appendIn(struct _listEntry **list, struct _hashUpdateEntry **hashtable, const ccSchedulerFunc& callback, void *target, bool paused);
+	
     float _timeScale;
 
     //
     // "updates with priority" stuff
     //
-    struct _listEntry *_updatesNegList;        // list of priority < 0
-    struct _listEntry *_updates0List;            // list priority == 0
-    struct _listEntry *_updatesPosList;        // list priority > 0
-    struct _hashUpdateEntry *_hashForUpdates; // hash used to fetch quickly the list entries for pause,delete,etc
+
+	std::vector<UpdatePhase> _updatePhases;
 
     // Used for "selectors with interval"
     struct _hashSelectorEntry *_hashForTimers;
