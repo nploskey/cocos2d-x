@@ -1316,33 +1316,124 @@ public:
      */
     bool isScheduled(const std::string &key);
 
-    /**
-     * Schedules the "update" method.
-     *
-     * It will use the order number 0. This method will be called every frame.
-     * Scheduled methods with a lower order value will be called before the ones that have a higher order value.
-     * Only one "update" method could be scheduled per node.
-     * @lua NA
-     */
-    void scheduleUpdate(void);
+	/**
+	* Schedules the "earlyearlyUpdate" method with a priority, defaulted to 0.
+	*
+	* This selector will be called every frame.
+	* Scheduled methods with a lower priority will be called before the ones that have a higher value.
+	* Only one "earlyUpdate" selector could be scheduled per node (You can't have 2 'earlyUpdate' selectors).
+	* @lua NA
+	*
+	* @param priority A given priority value.
+	*/
+	void scheduleEarlyUpdate(int priority = 0);
 
-    /**
-     * Schedules the "update" method with a custom priority.
-     *
-     * This selector will be called every frame.
-     * Scheduled methods with a lower priority will be called before the ones that have a higher value.
-     * Only one "update" selector could be scheduled per node (You can't have 2 'update' selectors).
-     * @lua NA
-     *
-     * @param priority A given priority value.
-     */
-    void scheduleUpdateWithPriority(int priority);
+	/**
+	* Schedules the "fixedEarlyUpdate" method with a priority, defaulted to 0.
+	*
+	* This selector will be called every frame.
+	* Scheduled methods with a lower priority will be called before the ones that have a higher value.
+	* Only one "fixedEarlyUpdate" selector could be scheduled per node (You can't have 2 'fixedEarlyUpdate' selectors).
+	* @lua NA
+	*
+	* @param priority A given priority value.
+	*/
+	void scheduleFixedEarlyUpdate(int priority = 0);
+	
+	/**
+	* Schedules the "update" method with a priority, defaulted to 0.
+	*
+	* This selector will be called every frame.
+	* Scheduled methods with a lower priority will be called before the ones that have a higher value.
+	* Only one "update" selector could be scheduled per node (You can't have 2 'update' selectors).
+	* @lua NA
+	*
+	* @param priority A given priority value.
+	*/
+	void scheduleUpdate(int priority = 0);
 
+	/**
+	* Schedules the "fixedUpdate" method with a priority, defaulted to 0.
+	*
+	* This selector will be called every frame.
+	* Scheduled methods with a lower priority will be called before the ones that have a higher value.
+	* Only one "fixedUpdate" selector could be scheduled per node (You can't have 2 'fixedUpdate' selectors).
+	* @lua NA
+	*
+	* @param priority A given priority value.
+	*/
+	void scheduleFixedUpdate(int priority = 0);
+
+	/**
+	* Schedules the "lateUpdate" method with a priority, defaulted to 0.
+	*
+	* This selector will be called every frame.
+	* Scheduled methods with a lower priority will be called before the ones that have a higher value.
+	* Only one "lateUpdate" selector could be scheduled per node (You can't have 2 'lateUpdate' selectors).
+	* @lua NA
+	*
+	* @param priority A given priority value.
+	*/
+	void scheduleLateUpdate(int priority = 0);
+
+	/**
+	* Schedules the "fixedLateUpdate" method with a priority, defaulted to 0.
+	*
+	* This selector will be called every frame.
+	* Scheduled methods with a lower priority will be called before the ones that have a higher value.
+	* Only one "fixedLateUpdate" selector could be scheduled per node (You can't have 2 'fixedLateUpdate' selectors).
+	* @lua NA
+	*
+	* @param priority A given priority value.
+	*/
+	void scheduleFixedLateUpdate(int priority = 0);
+
+	/**
+	* Schedules the "update" method with a custom priority.
+	*
+	* This selector will be called every frame.
+	* Scheduled methods with a lower priority will be called before the ones that have a higher value.
+	* Only one "update" selector could be scheduled per node (You can't have 2 'update' selectors).
+	* @lua NA
+	*
+	* @param priority A given priority value.
+	*/
+	void scheduleUpdateWithPriority(int priority) { scheduleUpdate(priority); }
+
+	/*
+	* Unschedules the "earlyUpdate" method.
+	* @see scheduleEarlyUpdate();
+	*/
+	void unscheduleEarlyUpdate(void);
+
+	/*
+	* Unschedules the "fixedEarlyupdate" method.
+	* @see scheduleFixedEarlyUpdate();
+	*/
+	void unscheduleFixedEarlyUpdate(void);
+
+	/*
+	* Unschedules the "update" method.
+	* @see scheduleUpdate();
+	*/
+	void unscheduleUpdate(void);
+
+	/*
+	* Unschedules the "fixedUpdate" method.
+	* @see scheduleFixedUpdate();
+	*/
+	void unscheduleFixedUpdate(void);
+
+	/*
+	* Unschedules the "lateUpdate" method.
+	* @see scheduleLateUpdate();
+	*/
+	void unscheduleLateUpdate(void);
     /*
-     * Unschedules the "update" method.
-     * @see scheduleUpdate();
+     * Unschedules the "fixedLateUpdate" method.
+     * @see scheduleFixedLateUpdate();
      */
-    void unscheduleUpdate(void);
+    void unscheduleFixedLateUpdate(void);
 
     /**
      * Schedules a custom selector.
@@ -1481,11 +1572,41 @@ public:
      */
     CC_DEPRECATED_ATTRIBUTE void pauseSchedulerAndActions();
 
+	/**
+	* Update method will be called automatically every frame if scheduled, and the node is "live".
+	* @param delta In seconds.
+	*/
+	virtual void earlyUpdate(float delta) {}
+
+	/**
+	* Update method will be called automatically every frame if scheduled, and the node is "live".
+	* @param delta In seconds.
+	*/
+	virtual void fixedEarlyUpdate(float delta) {}
+
     /**
      * Update method will be called automatically every frame if "scheduleUpdate" is called, and the node is "live".
      * @param delta In seconds.
      */
     virtual void update(float delta);
+
+	/**
+	* Update method will be called automatically every frame if scheduled, and the node is "live".
+	* @param delta In seconds.
+	*/
+	virtual void fixedUpdate(float delta) {}
+
+	/**
+	* Update method will be called automatically every frame if scheduled, and the node is "live".
+	* @param delta In seconds.
+	*/
+	virtual void lateUpdate(float delta) {}
+
+	/**
+	* Update method will be called automatically every frame if scheduled, and the node is "live".
+	* @param delta In seconds.
+	*/
+	virtual void fixedLateUpdate(float delta) {}
 
     /// @} end of Scheduler and Timer
 

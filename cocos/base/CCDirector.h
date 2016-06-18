@@ -195,6 +195,16 @@ public:
      */
     void setNextDeltaTimeZero(bool nextDeltaTimeZero);
 
+	/**
+	 * Get the current time interval used for fixed updates in seconds.
+	 */
+	float getFixedDeltaTimeInterval() const { return _fixedDeltaTimeInterval; }
+
+	/**
+	 * Sets the time interval to use for fixed updates in seconds.
+	 */
+	void setFixedDeltaTimeInterval(float dt);
+
     /** Whether or not the Director is paused. */
     inline bool isPaused() { return _paused; }
 
@@ -556,6 +566,8 @@ protected:
 
     float _animationInterval;
     float _oldAnimationInterval;
+
+	float _fixedDeltaTimeInterval;
 
     /* landscape mode ? */
     bool _landscape;

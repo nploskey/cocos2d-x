@@ -245,6 +245,7 @@ const int Scheduler::PRIORITY_NON_SYSTEM_MIN = PRIORITY_SYSTEM + 1;
 
 Scheduler::Scheduler(void)
 : _timeScale(1.0f)
+, _fixedDeltaAccumulator(0.f)
 , _updatePhases(UpdatePhase::_numIds, UpdatePhase())
 , _hashForTimers(nullptr)
 , _currentTarget(nullptr)
@@ -847,41 +848,26 @@ void Scheduler::update(float dt)
         dt *= _timeScale;
     }
 
+	// Calculate number of fixed updates to run
+	float fixed_dt = Director::getInstance()->getFixedDeltaTimeInterval();
+	_fixedDeltaAccumulator += dt;
+	int numFixedUpdates = 0;
+	while (_fixedDeltaAccumulator >= fixed_dt) {
+		++numFixedUpdates;
+		_fixedDeltaAccumulator -= fixed_dt;
+	}
+
     //
     // Selector callbacks
     //
 
     // Iterate over all the Updates' selectors
-    tListEntry *entry, *tmp;
-	for (int i = 0; i < UpdatePhase::_numIds; ++i) {
-		UpdatePhase *phase = &_updatePhases[i];
-		// updates with priority < 0
-		DL_FOREACH_SAFE(phase->negList, entry, tmp)
-		{
-			if ((!entry->paused) && (!entry->markedForDeletion))
-			{
-				entry->callback(dt);
-			}
-		}
-
-		// updates with priority == 0
-		DL_FOREACH_SAFE(phase->zeroList, entry, tmp)
-		{
-			if ((!entry->paused) && (!entry->markedForDeletion))
-			{
-				entry->callback(dt);
-			}
-		}
-
-		// updates with priority > 0
-		DL_FOREACH_SAFE(phase->posList, entry, tmp)
-		{
-			if ((!entry->paused) && (!entry->markedForDeletion))
-			{
-				entry->callback(dt);
-			}
-		}
-	}
+	updatePhase(UpdatePhase::EARLY_UPDATE, dt);
+	updatePhase(UpdatePhase::FIXED_EARLY_UPDATE, fixed_dt, numFixedUpdates);
+	updatePhase(UpdatePhase::UPDATE, dt);
+	updatePhase(UpdatePhase::FIXED_UPDATE, fixed_dt, numFixedUpdates);
+	updatePhase(UpdatePhase::LATE_UPDATE, dt);
+	updatePhase(UpdatePhase::FIXED_LATE_UPDATE, fixed_dt, numFixedUpdates);
 
     // Iterate over all the custom selectors
     for (tHashTimerEntry *elt = _hashForTimers; elt != nullptr; )
@@ -922,8 +908,10 @@ void Scheduler::update(float dt)
         }
     }
 
+	UpdatePhase *phase;
+	tListEntry *entry, *tmp;
 	for (int i = 0; i < UpdatePhase::_numIds; ++i) {
-		UpdatePhase *phase = &_updatePhases[i];
+		phase = &_updatePhases[i];
 		// delete all updates that are marked for deletion
 		// updates with priority < 0
 		DL_FOREACH_SAFE(phase->negList, entry, tmp)
@@ -976,6 +964,7 @@ void Scheduler::update(float dt)
         }
     }
 #endif
+
     //
     // Functions allocated from another thread
     //
@@ -993,6 +982,39 @@ void Scheduler::update(float dt)
         }
         
     }
+}
+
+void Scheduler::updatePhase(UpdatePhase::Id phaseID, float dt, int numTimes) {
+	if (numTimes <= 0) { return; }
+
+	UpdatePhase *phase = &_updatePhases[phaseID];
+	tListEntry *entry, *tmp;
+	// updates with priority < 0
+	DL_FOREACH_SAFE(phase->negList, entry, tmp)
+	{
+		if ((!entry->paused) && (!entry->markedForDeletion))
+		{
+			entry->callback(dt);
+		}
+	}
+
+	// updates with priority == 0
+	DL_FOREACH_SAFE(phase->zeroList, entry, tmp)
+	{
+		if ((!entry->paused) && (!entry->markedForDeletion))
+		{
+			entry->callback(dt);
+		}
+	}
+
+	// updates with priority > 0
+	DL_FOREACH_SAFE(phase->posList, entry, tmp)
+	{
+		if ((!entry->paused) && (!entry->markedForDeletion))
+		{
+			entry->callback(dt);
+		}
+	}
 }
 
 void Scheduler::schedule(SEL_SCHEDULE selector, Ref *target, float interval, unsigned int repeat, float delay, bool paused)

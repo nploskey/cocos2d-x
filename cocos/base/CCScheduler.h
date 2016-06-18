@@ -636,7 +636,10 @@ protected:
     void priorityIn(struct _listEntry **list, struct _hashUpdateEntry **hashtable, const ccSchedulerFunc& callback, void *target, int priority, bool paused);
     void appendIn(struct _listEntry **list, struct _hashUpdateEntry **hashtable, const ccSchedulerFunc& callback, void *target, bool paused);
 	
+	void updatePhase(UpdatePhase::Id phaseID, float dt, int numTimes = 1);
+
     float _timeScale;
+	float _fixedDeltaAccumulator;
 
     //
     // "updates with priority" stuff

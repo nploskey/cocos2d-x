@@ -1495,14 +1495,29 @@ bool Node::isScheduled(const std::string &key)
     return _scheduler->isScheduled(key, this);
 }
 
-void Node::scheduleUpdate()
-{
-    scheduleUpdateWithPriority(0);
+void Node::scheduleEarlyUpdate(int priority) {
+	_scheduler->scheduleEarlyUpdate(this, priority, !_running);
 }
 
-void Node::scheduleUpdateWithPriority(int priority)
+void Node::scheduleFixedEarlyUpdate(int priority) {
+	_scheduler->scheduleFixedEarlyUpdate(this, priority, !_running);
+}
+
+void Node::scheduleUpdate(int priority)
 {
-    _scheduler->scheduleUpdate(this, priority, !_running);
+	_scheduler->scheduleUpdate(this, priority, !_running);
+}
+
+void Node::scheduleFixedUpdate(int priority) {
+	_scheduler->scheduleFixedUpdate(this, priority, !_running);
+}
+
+void Node::scheduleLateUpdate(int priority) {
+	_scheduler->scheduleLateUpdate(this, priority, !_running);
+}
+
+void Node::scheduleFixedLateUpdate(int priority) {
+	_scheduler->scheduleFixedLateUpdate(this, priority, !_running);
 }
 
 void Node::scheduleUpdateWithPriorityLua(int nHandler, int priority)
@@ -1516,6 +1531,16 @@ void Node::scheduleUpdateWithPriorityLua(int nHandler, int priority)
     _scheduler->scheduleUpdate(this, priority, !_running);
 }
 
+void Node::unscheduleEarlyUpdate()
+{
+	_scheduler->unscheduleEarlyUpdate(this);
+}
+
+void Node::unscheduleFixedEarlyUpdate()
+{
+	_scheduler->unscheduleFixedEarlyUpdate(this);
+}
+
 void Node::unscheduleUpdate()
 {
     _scheduler->unscheduleUpdate(this);
@@ -1527,6 +1552,21 @@ void Node::unscheduleUpdate()
         _updateScriptHandler = 0;
     }
 #endif
+}
+
+void Node::unscheduleFixedUpdate()
+{
+	_scheduler->unscheduleFixedUpdate(this);
+}
+
+void Node::unscheduleLateUpdate()
+{
+	_scheduler->unscheduleLateUpdate(this);
+}
+
+void Node::unscheduleFixedLateUpdate()
+{
+	_scheduler->unscheduleFixedLateUpdate(this);
 }
 
 void Node::schedule(SEL_SCHEDULE selector)
