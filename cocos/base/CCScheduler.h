@@ -31,14 +31,17 @@ THE SOFTWARE.
 #include <functional>
 #include <mutex>
 #include <set>
+#include <array>
 
 #include "base/CCRef.h"
 #include "base/CCVector.h"
 #include "base/uthash.h"
+#include <unordered_map>
 
 NS_CC_BEGIN
 
 class Scheduler;
+class Scene;
 struct _listEntry;
 struct _hashSelectorEntry;
 struct _hashUpdateEntry;
@@ -49,15 +52,28 @@ struct UpdatePhase
 {
 	enum Id
 	{
+		FRAME_START,
+
 		EARLY_UPDATE,
 		FIXED_EARLY_UPDATE,
 		UPDATE,
 		FIXED_UPDATE,
 		LATE_UPDATE,
 		FIXED_LATE_UPDATE,
-		_numIds
+
+		FRAME_END,
+
+		PHYSICS_STEP,	// The physics step can be scheduled before or after any update phase.
+						// It is unscheduled by default.
+
+		_numPhaseIds
 	};
 
+	UpdatePhase(Id id) : id(id) {}
+
+	const Id id;
+	bool isEnabled = false;
+	bool isFixed = false;
 	_listEntry* negList = nullptr;
 	_listEntry* zeroList = nullptr;
 	_listEntry* posList = nullptr;
@@ -181,48 +197,58 @@ The 'custom selectors' should be avoided when possible. It is faster, and consum
 class CC_DLL Scheduler : public Ref
 {
 public:
-    /** Priority level reserved for system services. 
-     * @lua NA
-     * @js NA
-     */
-    static const int PRIORITY_SYSTEM;
-    
-    /** Minimum priority level for user scheduling. 
-     * Priority level of user scheduling should bigger then this value.
-     *
-     * @lua NA
-     * @js NA
-     */
-    static const int PRIORITY_NON_SYSTEM_MIN;
-    
-    /**
-     * Constructor
-     *
-     * @js ctor
-     */
-    Scheduler();
-    
-    /**
-     * Destructor
-     *
-     * @js NA
-     * @lua NA
-     */
-    virtual ~Scheduler();
+	/** Priority level reserved for system services.
+	 * @lua NA
+	 * @js NA
+	 */
+	static const int PRIORITY_SYSTEM;
 
-    /**
-     * Gets the time scale of schedule callbacks.
-     * @see Scheduler::setTimeScale()
-     */
-    inline float getTimeScale() { return _timeScale; }
-    /** Modifies the time of all scheduled callbacks.
-    You can use this property to create a 'slow motion' or 'fast forward' effect.
-    Default is 1.0. To create a 'slow motion' effect, use values below 1.0.
-    To create a 'fast forward' effect, use values higher than 1.0.
-    @since v0.8
-    @warning It will affect EVERY scheduled selector / action.
-    */
-    inline void setTimeScale(float timeScale) { _timeScale = timeScale; }
+	/** Minimum priority level for user scheduling.
+	 * Priority level of user scheduling should bigger then this value.
+	 *
+	 * @lua NA
+	 * @js NA
+	 */
+	static const int PRIORITY_NON_SYSTEM_MIN;
+
+	/**
+	 * Constructor
+	 *
+	 * @js ctor
+	 */
+	Scheduler();
+
+	/**
+	 * Destructor
+	 *
+	 * @js NA
+	 * @lua NA
+	 */
+	virtual ~Scheduler();
+
+	/**
+	 * Gets the time scale of schedule callbacks.
+	 * @see Scheduler::setTimeScale()
+	 */
+	inline float getTimeScale() { return _timeScale; }
+	/** Modifies the time of all scheduled callbacks.
+	You can use this property to create a 'slow motion' or 'fast forward' effect.
+	Default is 1.0. To create a 'slow motion' effect, use values below 1.0.
+	To create a 'fast forward' effect, use values higher than 1.0.
+	@since v0.8
+	@warning It will affect EVERY scheduled selector / action.
+	*/
+	inline void setTimeScale(float timeScale) { _timeScale = timeScale; }
+
+	/** Enable an update phase in the per frame sequence.
+	The corresponding update phase must be enabled for the various update
+	callbacks to be performed.
+	*/
+	void enablePhase(UpdatePhase::Id phaseID);
+
+	/** Enable the physic step at a specified time in the per frame sequence.
+	*/
+	void enablePhysicsStepAfterPhase(UpdatePhase::Id phaseID);
 
     /** 'update' the scheduler.
      * You should NEVER call this method, unless you know what you are doing.
@@ -288,7 +314,8 @@ public:
      @param paused Whether or not to pause the schedule.
      */
     void schedule(SEL_SCHEDULE selector, Ref *target, float interval, bool paused);
-    
+ 
+
 	/** Schedules the 'earlyUpdate' selector for a given target with a given priority.
 	The 'earlyUpdate' selector will be called every frame.
 	The lower the priority, the earlier it is called.
@@ -297,7 +324,7 @@ public:
 	*/
 	template <class T>
 	void scheduleEarlyUpdate(T *target, int priority, bool paused) {
-		this->schedulePerFrame(UpdatePhase::EARLY_UPDATE, [target](float dt) {
+		this->schedulePerFrame(_updatePhases[UpdatePhase::EARLY_UPDATE], [target](float dt) {
 			target->earlyUpdate(dt);
 		}, target, priority, paused);
 	}
@@ -310,7 +337,7 @@ public:
 	*/
 	template <class T>
 	void scheduleFixedEarlyUpdate(T *target, int priority, bool paused) {
-		this->schedulePerFrame(UpdatePhase::FIXED_EARLY_UPDATE, [target](float dt) {
+		this->schedulePerFrame(_updatePhases[UpdatePhase::FIXED_EARLY_UPDATE], [target](float dt) {
 			target->fixedEarlyUpdate(dt);
 		}, target, priority, paused);
 	}
@@ -324,7 +351,7 @@ public:
     template <class T>
     void scheduleUpdate(T *target, int priority, bool paused)
     {
-		this->schedulePerFrame(UpdatePhase::UPDATE, [target](float dt) {
+		this->schedulePerFrame(_updatePhases[UpdatePhase::UPDATE], [target](float dt) {
 			target->update(dt);
 		}, target, priority, paused);
     }
@@ -337,7 +364,7 @@ public:
 	*/
 	template <class T>
 	void scheduleFixedUpdate(T* target, int priority, bool paused) {
-		this->schedulePerFrame(UpdatePhase::FIXED_UPDATE, [target](float dt) {
+		this->schedulePerFrame(_updatePhases[UpdatePhase::FIXED_UPDATE], [target](float dt) {
 			target->fixedUpdate(dt);
 		}, target, priority, paused);
 	}
@@ -350,7 +377,7 @@ public:
 	*/
 	template <class T>
 	void scheduleLateUpdate(T *target, int priority, bool paused) {
-		this->schedulePerFrame(UpdatePhase::LATE_UPDATE, [target](float dt) {
+		this->schedulePerFrame(_updatePhases[UpdatePhase::LATE_UPDATE], [target](float dt) {
 			target->lateUpdate(dt);
 		}, target, priority, paused);
 	}
@@ -363,10 +390,14 @@ public:
 	*/
 	template <class T>
 	void scheduleFixedLateUpdate(T* target, int priority, bool paused) {
-		this->schedulePerFrame(UpdatePhase::FIXED_LATE_UPDATE, [target](float dt) {
+		this->schedulePerFrame(_updatePhases[UpdatePhase::FIXED_LATE_UPDATE], [target](float dt) {
 			target->fixedLateUpdate(dt);
 		}, target, priority, paused);
 	}
+
+	/** Schedules recurring execution of the physics step associated with a scene.
+	*/
+	void schedulePhysicsStep(Scene* sceneTarget, int priority, bool paused);
 
 #if CC_ENABLE_SCRIPT_BINDING
     // Schedule for script bindings.
@@ -406,7 +437,7 @@ public:
 	@since v0.99.3
 	*/
 	void unscheduleEarlyUpdate(void *target) {
-		unschedulePerFrame(UpdatePhase::EARLY_UPDATE, target);
+		unschedulePerFrame(_updatePhases[UpdatePhase::EARLY_UPDATE], target);
 	}
 
 	/** Unschedules the fixedEarlyUpdate selector for a given target
@@ -414,7 +445,7 @@ public:
 	@since v0.99.3
 	*/
 	void unscheduleFixedEarlyUpdate(void *target) {
-		unschedulePerFrame(UpdatePhase::FIXED_EARLY_UPDATE, target);
+		unschedulePerFrame(_updatePhases[UpdatePhase::FIXED_EARLY_UPDATE], target);
 	}
 
     /** Unschedules the update selector for a given target
@@ -422,7 +453,7 @@ public:
      @since v0.99.3
      */
     void unscheduleUpdate(void *target) {
-		unschedulePerFrame(UpdatePhase::UPDATE, target);
+		unschedulePerFrame(_updatePhases[UpdatePhase::UPDATE], target);
     }
 
 	/** Unschedules the fixedUpdate selector for a given target
@@ -430,7 +461,7 @@ public:
 	@since v0.99.3
 	*/
 	void unscheduleFixedUpdate(void *target) {
-		unschedulePerFrame(UpdatePhase::FIXED_UPDATE, target);
+		unschedulePerFrame(_updatePhases[UpdatePhase::FIXED_UPDATE], target);
 	}
 
 	/** Unschedules the lateUpdate selector for a given target
@@ -438,7 +469,7 @@ public:
 	@since v0.99.3
 	*/
 	void unscheduleLateUpdate(void *target) {
-		unschedulePerFrame(UpdatePhase::LATE_UPDATE, target);
+		unschedulePerFrame(_updatePhases[UpdatePhase::LATE_UPDATE], target);
 	}
 
 	/** Unschedules the fixedLateUpdate selector for a given target
@@ -446,7 +477,14 @@ public:
 	@since v0.99.3
 	*/
 	void unscheduleFixedLateUpdate(void *target) {
-		unschedulePerFrame(UpdatePhase::FIXED_LATE_UPDATE, target);
+		unschedulePerFrame(_updatePhases[UpdatePhase::FIXED_LATE_UPDATE], target);
+	}
+
+	/** Unschedules the physics step associated with the registered scene.
+	@param target The target scene to be unscheduled.
+	*/
+	void unschedulePhysicsStep(Scene *sceneTarget) {
+		unschedulePerFrame(_updatePhases[UpdatePhase::PHYSICS_STEP], sceneTarget);
 	}
     
     /** Unschedules all selectors for a given target.
@@ -624,9 +662,9 @@ protected:
      @since v3.0
      @js _schedulePerFrame
      */
-    void schedulePerFrame(UpdatePhase::Id phaseID, const ccSchedulerFunc& callback, void *target, int priority, bool paused);
+    void schedulePerFrame(UpdatePhase& phase, const ccSchedulerFunc& callback, void *target, int priority, bool paused);
 
-	void unschedulePerFrame(UpdatePhase::Id phaseID, void *target);
+	void unschedulePerFrame(UpdatePhase& phase, void *target);
     
     void removeHashElement(struct _hashSelectorEntry *element);
     void removeUpdateFromHash(struct _listEntry *entry, struct _hashUpdateEntry **hashtable);
@@ -636,7 +674,7 @@ protected:
     void priorityIn(struct _listEntry **list, struct _hashUpdateEntry **hashtable, const ccSchedulerFunc& callback, void *target, int priority, bool paused);
     void appendIn(struct _listEntry **list, struct _hashUpdateEntry **hashtable, const ccSchedulerFunc& callback, void *target, bool paused);
 	
-	void updatePhase(UpdatePhase::Id phaseID, float dt, int numTimes = 1);
+	void updatePhase(UpdatePhase& phase, float dt, int numTimes = 1);
 
     float _timeScale;
 	float _fixedDeltaAccumulator;
@@ -646,6 +684,8 @@ protected:
     //
 
 	std::vector<UpdatePhase> _updatePhases;
+	std::vector<UpdatePhase*> _updateSequence;
+	UpdatePhase::Id _phaseBeforePhysicsStep;
 
     // Used for "selectors with interval"
     struct _hashSelectorEntry *_hashForTimers;

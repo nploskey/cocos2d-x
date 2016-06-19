@@ -208,6 +208,7 @@ protected:
 #if (CC_USE_PHYSICS || (CC_USE_3D_PHYSICS && CC_ENABLE_BULLET_INTEGRATION) || CC_USE_NAVMESH)
 public:
     void stepPhysicsAndNavigation(float deltaTime);
+	void schedulePhysicsStep(int priority = 0);
 #endif
 };
 

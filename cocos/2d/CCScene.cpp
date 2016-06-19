@@ -33,6 +33,7 @@ THE SOFTWARE.
 #include "renderer/CCRenderer.h"
 #include "renderer/CCFrameBuffer.h"
 #include "deprecated/CCString.h"
+#include "base/CCScheduler.h"
 
 #if CC_USE_PHYSICS
 #include "physics/CCPhysicsWorld.h"
@@ -334,6 +335,11 @@ void Scene::stepPhysicsAndNavigation(float deltaTime)
     }
 #endif
 }
+
+void Scene::schedulePhysicsStep(int priority) {
+	_scheduler->schedulePhysicsStep(this, priority, !_running);
+}
+
 #endif
 
 NS_CC_END

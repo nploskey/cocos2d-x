@@ -31,6 +31,15 @@ THE SOFTWARE.
 #include "base/utlist.h"
 #include "base/ccCArray.h"
 #include "base/CCScriptSupport.h"
+#include "2d/CCScene.h"
+
+#if CC_USE_PHYSICS
+#if CC_USE_3D_PHYSICS
+#include "physics3d/CCPhysics3DWorld.h"
+#else
+#include "physics/CCPhysicsWorld.h"
+#endif
+#endif
 
 NS_CC_BEGIN
 
@@ -246,7 +255,6 @@ const int Scheduler::PRIORITY_NON_SYSTEM_MIN = PRIORITY_SYSTEM + 1;
 Scheduler::Scheduler(void)
 : _timeScale(1.0f)
 , _fixedDeltaAccumulator(0.f)
-, _updatePhases(UpdatePhase::_numIds, UpdatePhase())
 , _hashForTimers(nullptr)
 , _currentTarget(nullptr)
 , _currentTargetSalvaged(false)
@@ -255,6 +263,15 @@ Scheduler::Scheduler(void)
 , _scriptHandlerEntries(20)
 #endif
 {
+	// Initialize ordered update phases
+	for (int i = 0; i < UpdatePhase::_numPhaseIds; ++i) {
+		_updatePhases.emplace_back(UpdatePhase::Id(i));
+	}
+	_updatePhases[UpdatePhase::FIXED_EARLY_UPDATE].isFixed = true;
+	_updatePhases[UpdatePhase::FIXED_UPDATE].isFixed = true;
+	_updatePhases[UpdatePhase::FIXED_LATE_UPDATE].isFixed = true;
+	enablePhase(UpdatePhase::UPDATE);
+
     // I don't expect to have more than 30 functions to all per frame
     _functionsToPerform.reserve(30);
 }
@@ -269,6 +286,43 @@ void Scheduler::removeHashElement(_hashSelectorEntry *element)
     ccArrayFree(element->timers);
     HASH_DEL(_hashForTimers, element);
     free(element);
+}
+
+void Scheduler::enablePhase(UpdatePhase::Id phaseID) {
+	assert(UpdatePhase::FRAME_START < phaseID && phaseID < UpdatePhase::FRAME_END);
+	UpdatePhase *phase = &_updatePhases[phaseID];
+	assert(!phase->isEnabled);
+
+	for (auto it = _updateSequence.begin(); it != _updateSequence.end(); ++it) {
+		if ((*it)->id == UpdatePhase::PHYSICS_STEP) {
+			++it;
+		}
+		else if ((*it)->id > phase->id) {
+			_updateSequence.insert(it, phase);
+			phase->isEnabled = true;
+			return;
+		}
+	}
+	_updateSequence.push_back(phase);
+	phase->isEnabled = true;
+}
+
+void Scheduler::enablePhysicsStepAfterPhase(UpdatePhase::Id phaseID) {
+	assert(UpdatePhase::FRAME_START <= phaseID && phaseID < UpdatePhase::FRAME_END);
+	UpdatePhase *physicsPhase = &_updatePhases[UpdatePhase::PHYSICS_STEP];
+	assert(!physicsPhase->isEnabled);
+
+	for (auto it = _updateSequence.begin(); it != _updateSequence.end(); ++it) {
+		if ((*it)->id == phaseID) {
+			_updateSequence.insert(++it, physicsPhase);
+			physicsPhase->isEnabled = true;
+			_phaseBeforePhysicsStep = phaseID;
+			return;
+		}
+	}
+	_updateSequence.push_back(physicsPhase);
+	physicsPhase->isEnabled = true;
+	_phaseBeforePhysicsStep = phaseID;
 }
 
 void Scheduler::schedule(const ccSchedulerFunc& callback, void *target, float interval, bool paused, const std::string& key)
@@ -456,11 +510,10 @@ void Scheduler::appendIn(_listEntry **list, struct _hashUpdateEntry **hashtable,
     HASH_ADD_PTR(*hashtable, target, hashElement);
 }
 
-void Scheduler::schedulePerFrame(UpdatePhase::Id phaseID, const ccSchedulerFunc& callback, void *target, int priority, bool paused)
+void Scheduler::schedulePerFrame(UpdatePhase& phase, const ccSchedulerFunc& callback, void *target, int priority, bool paused)
 {
-	UpdatePhase *phase = &_updatePhases[phaseID];
     tHashUpdateEntry *hashElement = nullptr;
-    HASH_FIND_PTR(phase->hashtable, &target, hashElement);
+    HASH_FIND_PTR(phase.hashtable, &target, hashElement);
     if (hashElement)
     {
         // check if priority has changed
@@ -476,7 +529,7 @@ void Scheduler::schedulePerFrame(UpdatePhase::Id phaseID, const ccSchedulerFunc&
             else
             {
             	// will be added again outside if (hashElement).
-                unschedulePerFrame(phaseID, target);
+                unschedulePerFrame(phase, target);
             }
         }
         else
@@ -491,29 +544,24 @@ void Scheduler::schedulePerFrame(UpdatePhase::Id phaseID, const ccSchedulerFunc&
     // is an special list for updates with priority 0
     if (priority == 0)
     {
-		appendIn(&phase->zeroList, &phase->hashtable, callback, target, paused);
+		appendIn(&phase.zeroList, &phase.hashtable, callback, target, paused);
     }
     else if (priority < 0)
     {
-        priorityIn(&phase->negList, &phase->hashtable, callback, target, priority, paused);
+        priorityIn(&phase.negList, &phase.hashtable, callback, target, priority, paused);
     }
     else
     {
         // priority > 0
-        priorityIn(&phase->posList, &phase->hashtable, callback, target, priority, paused);
+        priorityIn(&phase.posList, &phase.hashtable, callback, target, priority, paused);
     }
 }
 
-void Scheduler::unschedulePerFrame(UpdatePhase::Id phaseID, void* target) {
-	if (target == nullptr)
-	{
-		return;
-	}
-
-	UpdatePhase *phase = &_updatePhases[phaseID];
+void Scheduler::unschedulePerFrame(UpdatePhase& phase, void* target) {
+	if (!target) { return; }
 
 	tHashUpdateEntry *element = nullptr;
-	HASH_FIND_PTR(phase->hashtable, &target, element);
+	HASH_FIND_PTR(phase.hashtable, &target, element);
 	if (element)
 	{
 		if (_updateHashLocked)
@@ -522,7 +570,7 @@ void Scheduler::unschedulePerFrame(UpdatePhase::Id phaseID, void* target) {
 		}
 		else
 		{
-			this->removeUpdateFromHash(element->entry, &phase->hashtable);
+			this->removeUpdateFromHash(element->entry, &phase.hashtable);
 		}
 	}
 }
@@ -595,15 +643,14 @@ void Scheduler::unscheduleAllWithMinPriority(int minPriority)
 
     // Updates selectors
     tListEntry *entry, *tmp;
-	for (int i = 0; i < UpdatePhase::_numIds; ++i) {
-		UpdatePhase *phase = &_updatePhases[i];
+	for (auto phase : _updateSequence) {
 		if (minPriority < 0)
 		{
 			DL_FOREACH_SAFE(phase->negList, entry, tmp)
 			{
 				if (entry->priority >= minPriority)
 				{
-					unschedulePerFrame(UpdatePhase::Id(i), entry->target);
+					unschedulePerFrame(*phase, entry->target);
 				}
 			}
 		}
@@ -612,7 +659,7 @@ void Scheduler::unscheduleAllWithMinPriority(int minPriority)
 		{
 			DL_FOREACH_SAFE(phase->zeroList, entry, tmp)
 			{
-				unschedulePerFrame(UpdatePhase::Id(i), entry->target);
+				unschedulePerFrame(*phase, entry->target);
 			}
 		}
 
@@ -620,7 +667,7 @@ void Scheduler::unscheduleAllWithMinPriority(int minPriority)
 		{
 			if (entry->priority >= minPriority)
 			{
-				unschedulePerFrame(UpdatePhase::Id(i), entry->target);
+				unschedulePerFrame(*phase, entry->target);
 			}
 		}
 	}
@@ -632,40 +679,54 @@ void Scheduler::unscheduleAllWithMinPriority(int minPriority)
 
 void Scheduler::unscheduleAllForTarget(void *target)
 {
-    // explicit nullptr handling
-    if (target == nullptr)
-    {
-        return;
-    }
-
-    // Custom Selectors
-    tHashTimerEntry *element = nullptr;
-    HASH_FIND_PTR(_hashForTimers, &target, element);
-
-    if (element)
-    {
-        if (ccArrayContainsObject(element->timers, element->currentTimer)
-            && (! element->currentTimerSalvaged))
-        {
-            element->currentTimer->retain();
-            element->currentTimerSalvaged = true;
-        }
-        ccArrayRemoveAllObjects(element->timers);
-
-        if (_currentTarget == element)
-        {
-            _currentTargetSalvaged = true;
-        }
-        else
-        {
-            removeHashElement(element);
-        }
-    }
-
-    // update selectors
-	for (int i = 0; i < UpdatePhase::_numIds; ++i) {
-		unschedulePerFrame(UpdatePhase::Id(i), target);
+	// explicit nullptr handling
+	if (target == nullptr)
+	{
+		return;
 	}
+
+	// Custom Selectors
+	tHashTimerEntry *element = nullptr;
+	HASH_FIND_PTR(_hashForTimers, &target, element);
+
+	if (element)
+	{
+		if (ccArrayContainsObject(element->timers, element->currentTimer)
+			&& (!element->currentTimerSalvaged))
+		{
+			element->currentTimer->retain();
+			element->currentTimerSalvaged = true;
+		}
+		ccArrayRemoveAllObjects(element->timers);
+
+		if (_currentTarget == element)
+		{
+			_currentTargetSalvaged = true;
+		}
+		else
+		{
+			removeHashElement(element);
+		}
+	}
+
+	// update selectors
+	for (auto phase : _updateSequence) {
+		unschedulePerFrame(*phase, target);
+	}
+}
+
+void Scheduler::schedulePhysicsStep(Scene* sceneTarget, int priority, bool paused) {
+#if CC_USE_PHYSICS
+#if CC_USE_3D_PHYSICS
+	schedulePerFrame(_updatePhases[UpdatePhase::PHYSICS_STEP], [sceneTarget](float dt) {
+		sceneTarget->getPhysics3DWorld()->stepSimulate(dt);
+	}, sceneTarget, 0, paused);
+#else
+	schedulePerFrame(_updatePhases[UpdatePhase::PHYSICS_STEP], [sceneTarget](float dt) {
+		sceneTarget->getPhysicsWorld()->step(dt);
+	}, sceneTarget, 0, paused);
+#endif
+#endif
 }
 
 #if CC_ENABLE_SCRIPT_BINDING
@@ -705,9 +766,9 @@ void Scheduler::resumeTarget(void *target)
 
     // update selectors
 	tHashUpdateEntry *elementUpdate;
-	for (int i = 0; i < UpdatePhase::_numIds; ++i) {
+	for (auto phase : _updateSequence) {
 		elementUpdate = nullptr;
-		HASH_FIND_PTR(_updatePhases[i].hashtable, &target, elementUpdate);
+		HASH_FIND_PTR(phase->hashtable, &target, elementUpdate);
 		if (elementUpdate)
 		{
 			CCASSERT(elementUpdate->entry != nullptr, "elementUpdate's entry can't be nullptr!");
@@ -730,9 +791,9 @@ void Scheduler::pauseTarget(void *target)
 
     // update selectors
     tHashUpdateEntry *elementUpdate;
-	for (int i = 0; i < UpdatePhase::_numIds; ++i) {
+	for (auto phase : _updateSequence) {
 		elementUpdate = nullptr;
-		HASH_FIND_PTR(_updatePhases[i].hashtable, &target, elementUpdate);
+		HASH_FIND_PTR(phase->hashtable, &target, elementUpdate);
 		if (elementUpdate)
 		{
 			CCASSERT(elementUpdate->entry != nullptr, "elementUpdate's entry can't be nullptr!");
@@ -755,9 +816,9 @@ bool Scheduler::isTargetPaused(void *target)
     
     // We should check update selectors if target does not have custom selectors
 	tHashUpdateEntry *elementUpdate;
-	for (int i = 0; i < UpdatePhase::_numIds; ++i) {
+	for (auto phase : _updateSequence) {
 		elementUpdate = nullptr;
-		HASH_FIND_PTR(_updatePhases[i].hashtable, &target, elementUpdate);
+		HASH_FIND_PTR(phase->hashtable, &target, elementUpdate);
 		if (elementUpdate)
 		{
 			return elementUpdate->entry->paused;
@@ -786,8 +847,7 @@ std::set<void*> Scheduler::pauseAllTargetsWithMinPriority(int minPriority)
 
     // Updates selectors
     tListEntry *entry, *tmp;
-	for (int i = 0; i < UpdatePhase::_numIds; ++i) {
-		UpdatePhase *phase = &_updatePhases[i];
+	for (auto phase : _updateSequence) {
 		if (minPriority < 0)
 		{
 			DL_FOREACH_SAFE(phase->negList, entry, tmp)
@@ -862,12 +922,13 @@ void Scheduler::update(float dt)
     //
 
     // Iterate over all the Updates' selectors
-	updatePhase(UpdatePhase::EARLY_UPDATE, dt);
-	updatePhase(UpdatePhase::FIXED_EARLY_UPDATE, fixed_dt, numFixedUpdates);
-	updatePhase(UpdatePhase::UPDATE, dt);
-	updatePhase(UpdatePhase::FIXED_UPDATE, fixed_dt, numFixedUpdates);
-	updatePhase(UpdatePhase::LATE_UPDATE, dt);
-	updatePhase(UpdatePhase::FIXED_LATE_UPDATE, fixed_dt, numFixedUpdates);
+	for (auto phase : _updateSequence) {
+		if (phase->isFixed) {
+			updatePhase(*phase, fixed_dt, numFixedUpdates);
+		} else {
+			updatePhase(*phase, dt);
+		}
+	}
 
     // Iterate over all the custom selectors
     for (tHashTimerEntry *elt = _hashForTimers; elt != nullptr; )
@@ -908,11 +969,9 @@ void Scheduler::update(float dt)
         }
     }
 
-	UpdatePhase *phase;
+	// delete all updates that are marked for deletion
 	tListEntry *entry, *tmp;
-	for (int i = 0; i < UpdatePhase::_numIds; ++i) {
-		phase = &_updatePhases[i];
-		// delete all updates that are marked for deletion
+	for (auto phase : _updateSequence) {
 		// updates with priority < 0
 		DL_FOREACH_SAFE(phase->negList, entry, tmp)
 		{
@@ -984,13 +1043,12 @@ void Scheduler::update(float dt)
     }
 }
 
-void Scheduler::updatePhase(UpdatePhase::Id phaseID, float dt, int numTimes) {
+void Scheduler::updatePhase(UpdatePhase& phase, float dt, int numTimes) {
 	if (numTimes <= 0) { return; }
 
-	UpdatePhase *phase = &_updatePhases[phaseID];
 	tListEntry *entry, *tmp;
 	// updates with priority < 0
-	DL_FOREACH_SAFE(phase->negList, entry, tmp)
+	DL_FOREACH_SAFE(phase.negList, entry, tmp)
 	{
 		if ((!entry->paused) && (!entry->markedForDeletion))
 		{
@@ -999,7 +1057,7 @@ void Scheduler::updatePhase(UpdatePhase::Id phaseID, float dt, int numTimes) {
 	}
 
 	// updates with priority == 0
-	DL_FOREACH_SAFE(phase->zeroList, entry, tmp)
+	DL_FOREACH_SAFE(phase.zeroList, entry, tmp)
 	{
 		if ((!entry->paused) && (!entry->markedForDeletion))
 		{
@@ -1008,7 +1066,7 @@ void Scheduler::updatePhase(UpdatePhase::Id phaseID, float dt, int numTimes) {
 	}
 
 	// updates with priority > 0
-	DL_FOREACH_SAFE(phase->posList, entry, tmp)
+	DL_FOREACH_SAFE(phase.posList, entry, tmp)
 	{
 		if ((!entry->paused) && (!entry->markedForDeletion))
 		{
