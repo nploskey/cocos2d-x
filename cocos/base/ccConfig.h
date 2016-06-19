@@ -30,6 +30,65 @@ THE SOFTWARE.
 
 #include "platform/CCPlatformConfig.h"
 
+// CUSTOM CONFIGURATION //////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
+
+//#define CC_SPRITE_DEBUG_DRAW 1
+//#define CC_LABEL_DEBUG_DRAW 1
+//#define CC_SPRITEBATCHNODE_DEBUG_DRAW 1
+//#define CC_LABELBMFONT_DEBUG_DRAW 1
+//#define CC_LABELATLAS_DEBUG_DRAW 1
+//#define CC_NODE_DEBUG_VERIFY_EVENT_LISTENERS 1
+
+#define CC_USE_3D_PHYSICS 0
+
+#define CC_USE_PNG 1
+#define CC_USE_JPEG 0
+#define CC_USE_TIFF 0
+#define CC_USE_WEBP 0
+
+/* FULL OPTION LIST ***************************
+#define CC_ENABLE_STACKABLE_ACTIONS
+#define CC_ENABLE_GL_STATE_CACHE
+#define CC_FIX_ARTIFACTS_BY_STRECHING_TEXEL
+#define CC_DIRECTOR_STATS_INTERVAL
+#define CC_DIRECTOR_FPS_POSITION
+#define CC_DIRECTOR_DISPATCH_FAST_EVENTS
+#define CC_DIRECTOR_MAC_USE_DISPLAY_LINK_THREAD
+#define CC_NODE_RENDER_SUBPIXEL
+#define CC_SPRITEBATCHNODE_RENDER_SUBPIXEL
+#define CC_TEXTURE_ATLAS_USE_VAO
+#define CC_USE_LA88_LABELS
+#define CC_SPRITE_DEBUG_DRAW
+#define CC_LABEL_DEBUG_DRAW
+#define CC_SPRITEBATCHNODE_DEBUG_DRAW
+#define CC_LABELBMFONT_DEBUG_DRAW
+#define CC_LABELATLAS_DEBUG_DRAW
+#define CC_NODE_DEBUG_VERIFY_EVENT_LISTENERS
+#define CC_ENABLE_PROFILERS
+#define CC_LUA_ENGINE_DEBUG
+#define CC_USE_PHYSICS
+#define CC_USE_3D_PHYSICS
+#define CC_ENABLE_BULLET_INTEGRATION
+#define CC_USE_NAVMESH
+#define CC_USE_CULLING
+#define CC_USE_PNG
+#define CC_USE_JPEG
+#define CC_USE_TIFF
+#define CC_USE_WEBP
+#define CC_USE_WIC
+#define CC_ENABLE_SCRIPT_BINDING	// Disabling is broken
+#define CC_CONSTRUCTOR_ACCESS		// Non-public is broken
+#define CC_ENABLE_ALLOCATOR
+#define CC_ENABLE_ALLOCATOR_DIAGNOSTICS
+#define CC_ENABLE_ALLOCATOR_GLOBAL_NEW_DELETE
+#define CC_ALLOCATOR_GLOBAL
+#define CC_ALLOCATOR_GLOBAL_NEW_DELETE
+***********************************************/
+
+//////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
+
 /**
  * @file
  * cocos2d (cc) configuration file.
