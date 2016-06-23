@@ -52,20 +52,15 @@ struct UpdatePhase
 {
 	enum Id
 	{
-		FRAME_START,
-
 		EARLY_UPDATE,
 		FIXED_EARLY_UPDATE,
 		UPDATE,
 		FIXED_UPDATE,
 		LATE_UPDATE,
 		FIXED_LATE_UPDATE,
+		PHYSICS_STEP,
 
-		FRAME_END,
-
-		PHYSICS_STEP,	// The physics step can be scheduled before or after any update phase.
-						// It is unscheduled by default.
-
+		// This is only used for bookkeeping. Cannot be scheduled as a phase.
 		_numPhaseIds
 	};
 
@@ -240,15 +235,10 @@ public:
 	*/
 	inline void setTimeScale(float timeScale) { _timeScale = timeScale; }
 
-	/** Enable an update phase in the per frame sequence.
-	The corresponding update phase must be enabled for the various update
-	callbacks to be performed.
+	/** 
+	 * Sets the execution order of update selectors by phase id.
 	*/
-	void enablePhase(UpdatePhase::Id phaseID);
-
-	/** Enable the physic step at a specified time in the per frame sequence.
-	*/
-	void enablePhysicsStepAfterPhase(UpdatePhase::Id phaseID);
+	void setUpdateSequence(std::vector<UpdatePhase::Id> phaseIds);
 
     /** 'update' the scheduler.
      * You should NEVER call this method, unless you know what you are doing.
@@ -324,6 +314,7 @@ public:
 	*/
 	template <class T>
 	void scheduleEarlyUpdate(T *target, int priority, bool paused) {
+		assert(this->_updatePhases[UpdatePhase::EARLY_UPDATE].isEnabled);
 		this->schedulePerFrame(_updatePhases[UpdatePhase::EARLY_UPDATE], [target](float dt) {
 			target->earlyUpdate(dt);
 		}, target, priority, paused);
@@ -337,6 +328,7 @@ public:
 	*/
 	template <class T>
 	void scheduleFixedEarlyUpdate(T *target, int priority, bool paused) {
+		assert(this->_updatePhases[UpdatePhase::FIXED_EARLY_UPDATE].isEnabled);
 		this->schedulePerFrame(_updatePhases[UpdatePhase::FIXED_EARLY_UPDATE], [target](float dt) {
 			target->fixedEarlyUpdate(dt);
 		}, target, priority, paused);
@@ -351,6 +343,7 @@ public:
     template <class T>
     void scheduleUpdate(T *target, int priority, bool paused)
     {
+		assert(this->_updatePhases[UpdatePhase::UPDATE].isEnabled);
 		this->schedulePerFrame(_updatePhases[UpdatePhase::UPDATE], [target](float dt) {
 			target->update(dt);
 		}, target, priority, paused);
@@ -364,6 +357,7 @@ public:
 	*/
 	template <class T>
 	void scheduleFixedUpdate(T* target, int priority, bool paused) {
+		assert(this->_updatePhases[UpdatePhase::FIXED_UPDATE].isEnabled);
 		this->schedulePerFrame(_updatePhases[UpdatePhase::FIXED_UPDATE], [target](float dt) {
 			target->fixedUpdate(dt);
 		}, target, priority, paused);
@@ -377,6 +371,7 @@ public:
 	*/
 	template <class T>
 	void scheduleLateUpdate(T *target, int priority, bool paused) {
+		assert(this->_updatePhases[UpdatePhase::LATE_UPDATE].isEnabled);
 		this->schedulePerFrame(_updatePhases[UpdatePhase::LATE_UPDATE], [target](float dt) {
 			target->lateUpdate(dt);
 		}, target, priority, paused);
@@ -390,6 +385,7 @@ public:
 	*/
 	template <class T>
 	void scheduleFixedLateUpdate(T* target, int priority, bool paused) {
+		assert(this->_updatePhases[UpdatePhase::FIXED_LATE_UPDATE].isEnabled);
 		this->schedulePerFrame(_updatePhases[UpdatePhase::FIXED_LATE_UPDATE], [target](float dt) {
 			target->fixedLateUpdate(dt);
 		}, target, priority, paused);
@@ -685,7 +681,6 @@ protected:
 
 	std::vector<UpdatePhase> _updatePhases;
 	std::vector<UpdatePhase*> _updateSequence;
-	UpdatePhase::Id _phaseBeforePhysicsStep;
 
     // Used for "selectors with interval"
     struct _hashSelectorEntry *_hashForTimers;

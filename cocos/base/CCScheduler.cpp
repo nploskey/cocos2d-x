@@ -270,7 +270,7 @@ Scheduler::Scheduler(void)
 	_updatePhases[UpdatePhase::FIXED_EARLY_UPDATE].isFixed = true;
 	_updatePhases[UpdatePhase::FIXED_UPDATE].isFixed = true;
 	_updatePhases[UpdatePhase::FIXED_LATE_UPDATE].isFixed = true;
-	enablePhase(UpdatePhase::UPDATE);
+	setUpdateSequence({ UpdatePhase::UPDATE });
 
     // I don't expect to have more than 30 functions to all per frame
     _functionsToPerform.reserve(30);
@@ -281,48 +281,24 @@ Scheduler::~Scheduler(void)
     unscheduleAll();
 }
 
+void Scheduler::setUpdateSequence(std::vector<UpdatePhase::Id> phaseIds) {
+	for (auto& phase : _updatePhases) {
+		phase.isEnabled = false;
+	}
+	_updateSequence.clear();
+	for (auto id : phaseIds) {
+		assert(0 <= id && id < UpdatePhase::_numPhaseIds);
+		UpdatePhase *phase = &_updatePhases[id];
+		phase->isEnabled = true;
+		_updateSequence.push_back(phase);
+	}
+}
+
 void Scheduler::removeHashElement(_hashSelectorEntry *element)
 {
     ccArrayFree(element->timers);
     HASH_DEL(_hashForTimers, element);
     free(element);
-}
-
-void Scheduler::enablePhase(UpdatePhase::Id phaseID) {
-	assert(UpdatePhase::FRAME_START < phaseID && phaseID < UpdatePhase::FRAME_END);
-	UpdatePhase *phase = &_updatePhases[phaseID];
-	assert(!phase->isEnabled);
-
-	for (auto it = _updateSequence.begin(); it != _updateSequence.end(); ++it) {
-		if ((*it)->id == UpdatePhase::PHYSICS_STEP) {
-			++it;
-		}
-		else if ((*it)->id > phase->id) {
-			_updateSequence.insert(it, phase);
-			phase->isEnabled = true;
-			return;
-		}
-	}
-	_updateSequence.push_back(phase);
-	phase->isEnabled = true;
-}
-
-void Scheduler::enablePhysicsStepAfterPhase(UpdatePhase::Id phaseID) {
-	assert(UpdatePhase::FRAME_START <= phaseID && phaseID < UpdatePhase::FRAME_END);
-	UpdatePhase *physicsPhase = &_updatePhases[UpdatePhase::PHYSICS_STEP];
-	assert(!physicsPhase->isEnabled);
-
-	for (auto it = _updateSequence.begin(); it != _updateSequence.end(); ++it) {
-		if ((*it)->id == phaseID) {
-			_updateSequence.insert(++it, physicsPhase);
-			physicsPhase->isEnabled = true;
-			_phaseBeforePhysicsStep = phaseID;
-			return;
-		}
-	}
-	_updateSequence.push_back(physicsPhase);
-	physicsPhase->isEnabled = true;
-	_phaseBeforePhysicsStep = phaseID;
 }
 
 void Scheduler::schedule(const ccSchedulerFunc& callback, void *target, float interval, bool paused, const std::string& key)
