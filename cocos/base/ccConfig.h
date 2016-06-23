@@ -47,6 +47,12 @@ THE SOFTWARE.
 #define CC_USE_TIFF 0
 #define CC_USE_WEBP 0
 
+// Protected constructor access is broken.
+// Setting this to prevent disabling script bindings from attempting to set constructor access.
+#define CC_CONSTRUCTOR_ACCESS public
+
+#define CC_ENABLE_SCRIPT_BINDING 0
+
 /* FULL OPTION LIST ***************************
 #define CC_ENABLE_STACKABLE_ACTIONS
 #define CC_ENABLE_GL_STATE_CACHE
@@ -77,8 +83,8 @@ THE SOFTWARE.
 #define CC_USE_TIFF
 #define CC_USE_WEBP
 #define CC_USE_WIC
-#define CC_ENABLE_SCRIPT_BINDING	// Disabling is broken
-#define CC_CONSTRUCTOR_ACCESS		// Non-public is broken
+#define CC_ENABLE_SCRIPT_BINDING
+#define CC_CONSTRUCTOR_ACCESS
 #define CC_ENABLE_ALLOCATOR
 #define CC_ENABLE_ALLOCATOR_DIAGNOSTICS
 #define CC_ENABLE_ALLOCATOR_GLOBAL_NEW_DELETE
