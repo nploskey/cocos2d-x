@@ -404,6 +404,7 @@ protected:
     friend class Sprite;
     friend class Scene;
     friend class Director;
+	friend class Scheduler;
     friend class PhysicsBody;
     friend class PhysicsShape;
     friend class PhysicsJoint;

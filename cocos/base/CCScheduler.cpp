@@ -723,7 +723,7 @@ void Scheduler::schedulePhysicsStep(Scene* sceneTarget, int priority, bool pause
 	}, sceneTarget, 0, paused);
 #else
 	schedulePerFrame(_updatePhases[UpdatePhase::PHYSICS_STEP], [sceneTarget](float dt) {
-		sceneTarget->getPhysicsWorld()->step(dt);
+		sceneTarget->getPhysicsWorld()->update(dt);
 	}, sceneTarget, 0, paused);
 #endif
 #endif
