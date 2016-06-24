@@ -19,6 +19,7 @@
  */
 
 #include "math/Vec3.h"
+#include "math/Vec2.h"
 #include "math/MathUtil.h"
 #include "base/ccMacros.h"
 
@@ -49,6 +50,11 @@ Vec3::Vec3(const Vec3& copy)
     set(copy);
 }
 
+Vec3::Vec3(const Vec2& xy, float z)
+	: x(xy.x), y(xy.y), z(z)
+{
+}
+
 Vec3 Vec3::fromColor(unsigned int color)
 {
     float components[3];
@@ -66,6 +72,11 @@ Vec3 Vec3::fromColor(unsigned int color)
 
 Vec3::~Vec3()
 {
+}
+
+Vec2* Vec3::asVec2()
+{
+	return reinterpret_cast<Vec2*>(this);
 }
 
 float Vec3::angle(const Vec3& v1, const Vec3& v2)

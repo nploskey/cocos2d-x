@@ -340,6 +340,13 @@ public:
      */
     virtual const Vec2& getPosition() const;
 
+	/**
+	 * Gets the position in global coordinates.
+	 */
+	virtual Vec2 getWorldPosition() const {
+		return convertToWorldSpace(Vec2::ZERO);
+	}
+
     /** Returns the normalized position.
      * 
      * @return The normalized position.

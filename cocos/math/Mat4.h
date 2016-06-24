@@ -26,6 +26,7 @@
 
 #include "math/Vec3.h"
 #include "math/Vec4.h"
+#include "Vec2.h"
 
 #ifdef __SSE__
 #include <xmmintrin.h>
@@ -819,6 +820,58 @@ public:
      * @param dst A vector to store the transformed point in.
      */
     void transformVector(const Vec4& vector, Vec4* dst) const;
+
+	/**
+	* Transforms the specified 2d point by this matrix.
+	*
+	* The result of the transformation is stored directly into point.
+	*
+	* @param point The point to transform and also a vector to hold the result in.
+	*/
+	inline void transformPoint(Vec2* point) const {
+		GP_ASSERT(point); 
+		transformVector(point->x, point->y, 0.f, 1.0f, point);
+	}
+
+	/**
+	* Transforms the specified 2d point by this matrix, and stores
+	* the result in dst.
+	*
+	* @param point The point to transform.
+	* @param dst A vector to store the transformed point in.
+	*/
+	inline void transformPoint(const Vec2& point, Vec2* dst) const {
+		GP_ASSERT(dst); 
+		transformVector(point.x, point.y, 0.f, 1.0f, dst);
+	}
+
+	/**
+	* Transforms the specified 2d vector by this matrix by
+	* treating the fourth (w) coordinate as zero.
+	*
+	* The result of the transformation is stored directly into vector.
+	*
+	* @param vector The vector to transform and also a vector to hold the result in.
+	*/
+	void Mat4::transformVector(Vec2* vector) const {
+		GP_ASSERT(vector);
+		transformVector(vector->x, vector->y, 0.f, 0.0f, vector);
+	}
+
+	/**
+	* Transforms the specified 2d vector by this matrix by
+	* treating the fourth (w) coordinate as zero, and stores the
+	* result in dst.
+	*
+	* @param vector The vector to transform.
+	* @param dst A vector to store the transformed vector in.
+	*/
+	void Mat4::transformVector(const Vec2& vector, Vec2* dst) const {
+		GP_ASSERT(dst);
+		transformVector(vector.x, vector.y, 0.f, 0.0f, dst);
+	}
+
+	void Mat4::transformVector(float x, float y, float z, float w, Vec2* dst) const;
 
     /**
      * Post-multiplies this matrix by the matrix corresponding to the

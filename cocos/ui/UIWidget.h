@@ -626,7 +626,7 @@ public:
      *
      * @return Position of widget in world space.
      */
-    Vec2 getWorldPosition()const;
+    Vec2 getWorldPosition() const override;
 
     /**
      * Gets the inner Renderer node of widget.

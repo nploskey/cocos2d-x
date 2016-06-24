@@ -19,6 +19,7 @@
  */
 
 #include "math/Vec2.h"
+#include "math/Vec3.h"
 #include "math/MathUtil.h"
 #include "base/ccMacros.h"
 
@@ -65,6 +66,11 @@ bool isOneDimensionSegmentOverlap(float A, float B, float C, float D, float *S, 
 float crossProduct2Vector(const Vec2& A, const Vec2& B, const Vec2& C, const Vec2& D)
 {
     return (D.y - C.y) * (B.x - A.x) - (D.x - C.x) * (B.y - A.y);
+}
+
+Vec2::Vec2(const Vec3& v)
+	: x(v.x), y(v.y)
+{
 }
 
 float Vec2::angle(const Vec2& v1, const Vec2& v2)

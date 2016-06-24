@@ -911,6 +911,15 @@ void Mat4::transformVector(float x, float y, float z, float w, Vec3* dst) const
     MathUtil::transformVec4(m, x, y, z, w, (float*)dst);
 }
 
+void Mat4::transformVector(float x, float y, float z, float w, Vec2* dst) const
+{
+	GP_ASSERT(dst);
+	Vec3 v3{ x, y, 0.f };
+	MathUtil::transformVec4(m, x, y, z, w, (float*)&v3);
+	dst->x = v3.x;
+	dst->y = v3.y;
+}
+
 void Mat4::transformVector(Vec4* vector) const
 {
     GP_ASSERT(vector);

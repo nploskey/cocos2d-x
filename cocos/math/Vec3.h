@@ -31,6 +31,7 @@
 
 NS_CC_MATH_BEGIN
 
+class Vec2;
 class Mat4;
 class Quaternion;
 
@@ -98,6 +99,13 @@ public:
      */
     Vec3(const Vec3& copy);
 
+	/**
+	* Constructs a 3d vector from a 2d vector and a z-value.
+	*
+	* @param xy The 2d vector.
+	*/
+	explicit Vec3(const Vec2& xy, float z = 0.f);
+
     /**
      * Creates a new vector from an integer interpreted as an RGB value.
      * E.g. 0xff0000 represents red or the vector (1, 0, 0).
@@ -112,6 +120,11 @@ public:
      * Destructor.
      */
     ~Vec3();
+
+	/**
+	 * Reinterprets the vector as a Vec2.
+	 */
+	Vec2* asVec2();
 
     /**
      * Indicates whether this vector contains all zeros.

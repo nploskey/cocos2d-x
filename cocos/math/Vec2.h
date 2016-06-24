@@ -26,6 +26,7 @@
 #include <functional>
 #include <math.h>
 #include "math/CCMathBase.h"
+#include <base/ccMacros.h>
 
 /**
  * @addtogroup base
@@ -45,6 +46,7 @@ inline float clampf(float value, float min_inclusive, float max_inclusive)
     return value < min_inclusive ? min_inclusive : value < max_inclusive? value : max_inclusive;
 }
 
+class Vec3;
 class Mat4;
 
 /**
@@ -98,6 +100,13 @@ public:
      * @param copy The vector to copy.
      */
     Vec2(const Vec2& copy);
+
+	/**
+	* Constructs a 2d vector from a 3d vector by dropping the z-value.
+	*
+	* @param vec3 The 3d vector.
+	*/
+	explicit Vec2(const Vec3& vec3);
 
     /**
      * Destructor.
@@ -526,6 +535,14 @@ public:
      */
     float getAngle(const Vec2& other) const;
 
+	/** @returns the clockwise angle in degrees between this vector and the x axis
+	 * @js NA
+	 * @lua NA
+	 */
+	float getRotation() const {
+		return -CC_RADIANS_TO_DEGREES(getAngle());
+	}
+
     /** Calculates cross product of two points.
      @return float
      @since v2.1.4
@@ -654,6 +671,15 @@ public:
     {
         return Vec2(cosf(a), sinf(a));
     }
+
+	/** Construct unit vector pointing in the direction represented by a clockwise angle in degrees.
+	* @js NA
+	* @lua NA
+	*/
+	static inline Vec2 forRotation(const float a)
+	{
+		return forAngle(-CC_DEGREES_TO_RADIANS(a));
+	}
     
     /** A general line-line intersection test
      @param A   the startpoint for the first line L1 = (A - B)
