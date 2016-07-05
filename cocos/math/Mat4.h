@@ -853,7 +853,7 @@ public:
 	*
 	* @param vector The vector to transform and also a vector to hold the result in.
 	*/
-	void Mat4::transformVector(Vec2* vector) const {
+	void transformVector(Vec2* vector) const {
 		GP_ASSERT(vector);
 		transformVector(vector->x, vector->y, 0.f, 0.0f, vector);
 	}
@@ -866,12 +866,12 @@ public:
 	* @param vector The vector to transform.
 	* @param dst A vector to store the transformed vector in.
 	*/
-	void Mat4::transformVector(const Vec2& vector, Vec2* dst) const {
+	void transformVector(const Vec2& vector, Vec2* dst) const {
 		GP_ASSERT(dst);
 		transformVector(vector.x, vector.y, 0.f, 0.0f, dst);
 	}
 
-	void Mat4::transformVector(float x, float y, float z, float w, Vec2* dst) const;
+	void transformVector(float x, float y, float z, float w, Vec2* dst) const;
 
     /**
      * Post-multiplies this matrix by the matrix corresponding to the
