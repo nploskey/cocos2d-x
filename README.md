@@ -1,5 +1,23 @@
 <img src="http://www.cocos2d-x.org/attachments/801/cocos2dx_portrait.png" width=200>
 
+Fork Description
+================
+
+***NOTE:** This fork is unmaintained and not up to date with newer versions of the engine. If you like something you see here: by all means, rip it out and put it to use somewhere.*
+
+This fork adds additional per-frame callbacks to the scheduler and makes the step-sequence of each frame customizable and reorderable. Disabled or unused callback steps do not pose any additional performance penalty to the user. The full list of schedulable steps in each frame include:
+- EarlyUpdate
+- FixedEarlyUpdate
+- Update
+- FixedUpdate
+- LateUpdate
+- FixedLateUpdate
+- PhysicsStep
+
+Some additional convenience methods were also added for working with matrices and vectors. 
+
+All code additions reside in the 'custom' branch.
+
 
 cocos2d-x
 =========
